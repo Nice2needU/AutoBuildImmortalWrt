@@ -65,6 +65,8 @@ PACKAGES="$PACKAGES luci-app-acme"
 PACKAGES="$PACKAGES acme-acmesh-dnsapi"
 PACKAGES="$PACKAGES luci-proto-wireguard"
 PACKAGES="$PACKAGES qrencode"
+PACKAGES="$PACKAGES fdisk"
+PACKAGES="$PACKAGES luci-i18n-samba4-zh-cn"
 # 文件管理器
 PACKAGES="$PACKAGES luci-i18n-filemanager-zh-cn"
 
