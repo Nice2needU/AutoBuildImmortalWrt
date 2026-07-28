@@ -38,18 +38,9 @@ CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-netspeedtest luci-i18n-netspeedtest-z
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-mosdns luci-i18n-mosdns-zh-cn"
 # momo 代理工具 by nikkinikki-org（第三方）
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-momo luci-i18n-momo-zh-cn"
-# EasyTier 组网（第三方，依赖 kmod-tun luci-compat）
-CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-easytier kmod-tun luci-compat"
 # AdGuard Home（第三方 luci，二进制 adguardhome 在官方 packages feed）
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES adguardhome luci-app-adguardhome"
-# 统一文件共享 by linkease（第三方）
-CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-unishare"
-# 高级卸载（第三方）
-CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-uninstall"
-# TurboACC 网络加速（第三方 chenmozhijin/turboacc）
-CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-app-turboacc"
-# 主题（第三方）
-CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-theme-kucat"
+
 # 仓库内代理相关apk
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-i18n-nikki-zh-cn"
 #luci-app-openvpn-server 配置文件存在bug 因此请勿集成 避免报错 但你可以集成luci-i18n-openvpn-zh-cn
