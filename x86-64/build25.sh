@@ -106,6 +106,33 @@ else
     echo "⚪️ 未选择 luci-app-ssr-plus"
 fi
 
+PKGDIR=/home/build/immortalwrt/packages
+mkdir -p "$PKGDIR"
+
+# 通用函数：从 GitHub 最新 Release 下载匹配资产并解出 apk
+fetch_apk() {
+  local repo="$1" pattern="$2"
+  local url
+  url=$(curl -s "https://api.github.com/repos/${repo}/releases/latest" \
+    | grep -o '"browser_download_url": *"[^"]*"' \
+    | cut -d'"' -f4 | grep -E "$pattern" | head -n1)
+  if [ -z "$url" ]; then
+    echo "!! 未找到资产: ${repo} ${pattern}"; return 1
+  fi
+  echo "下载: $url"
+  curl -sL -o /tmp/pkg.bin "$url"
+  case "$url" in
+    *.zip) (cd /tmp && unzip -o pkg.bin) ;;
+    *)     tar -xzf /tmp/pkg.bin -C /tmp ;;
+  esac
+  find /tmp -maxdepth 3 -name '*.apk' -exec cp {} "$PKGDIR/" \;
+}
+
+fetch_apk "sirpdboy/netspeedtest"      'SNAPSHOT-x86_64\.tar\.gz$'
+fetch_apk "sbwml/luci-app-mosdns"      'x86_64.*(openwrt-25\.12|SNAPSHOT)\.tar\.gz$'
+fetch_apk "nikkinikki-org/OpenWrt-momo" 'momo_x86_64-openwrt-25\.12\.tar\.gz$'
+fetch_apk "sirpdboy/luci-app-advancedplus" '\.apk'
+
 # 构建镜像
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Building image with the following packages:"
 echo "$PACKAGES"
