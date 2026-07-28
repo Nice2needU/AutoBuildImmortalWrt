@@ -171,17 +171,6 @@ if [ "$FAILED" = "1" ]; then
   echo "❌ 有第三方 apk 下载失败，请检查上方日志中的资产名是否匹配"
   exit 1
 fi
-(
-  cd "$PKGDIR" || exit 1
-  for f in *.apk; do
-    [ -e "$f" ] || continue
-    newname=$(echo "$f" | sed -E 's/-[0-9][^-]*\.apk$/.apk/')
-    if [ "$f" != "$newname" ]; then
-      echo "重命名: $f -> $newname"
-      mv -f "$f" "$newname"
-    fi
-  done
-)
 
 echo "=== packages 目录最终内容 ==="
 ls -lah "$PKGDIR"
