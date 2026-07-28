@@ -1,0 +1,62 @@
+#!/bin/sh
+LOGTAG="delay-pppoe"
+WAN_IF="wan"
+WAN6_IF="wan6"
+DELAY_BOOT=30       # 冷启动延迟
+DELAY_RESTART=0     # network restart 几乎不需要延迟
+STATE_FILE="/tmp/delay-pppoe.lock"
+
+# 调试日志
+echo "$(date) delay-pppoe iface: ACTION=${ACTION} INTERFACE=${INTERFACE} DEVICE=${DEVICE}" >> /tmp/delay-pppoe.log
+
+# 只关心 lan ifup 事件
+[ "$INTERFACE" = "lan" ] || exit 0
+[ "$ACTION" = "ifup" ] || exit 0
+
+# 如果 wan 已经是 up，就不再折腾（避免已经连上的时候又被重拨）
+WAN_UP="$(ubus call network.interface.${WAN_IF} status 2>/dev/null | jsonfilter -e '@.up' 2>/dev/null)"
+if [ "$WAN_UP" = "true" ]; then
+    logger -t "$LOGTAG" "lan ifup, but $WAN_IF already up, skip."
+    exit 0
+fi
+
+# 如果已经有延迟任务在排队，就不要再排一个了
+if [ -e "$STATE_FILE" ]; then
+    logger -t "$LOGTAG" "lan ifup, delay job already scheduled, skip."
+    exit 0
+fi
+
+# 根据 uptime 判断是冷启动还是重启
+UPTIME_S="$(cut -d. -f1 /proc/uptime 2>/dev/null)"
+
+if [ -z "$UPTIME_S" ]; then
+    # 读不到 uptime，就保守按冷启动处理
+    SLEEP_SEC="$DELAY_BOOT"
+elif [ "$UPTIME_S" -lt 120 ]; then
+    # 开机 2 分钟内，认为是冷启动
+    SLEEP_SEC="$DELAY_BOOT"
+else
+    # 认为是 network restart / 手工 ifup 场景
+    SLEEP_SEC="$DELAY_RESTART"
+fi
+
+# 兜底
+[ -z "$SLEEP_SEC" ] && SLEEP_SEC="$DELAY_BOOT"
+
+touch "$STATE_FILE"
+
+logger -t "$LOGTAG" "lan ifup detected (uptime=${UPTIME_S:-unknown}s) — delaying ${SLEEP_SEC}s then ifup $WAN_IF/$WAN6_IF..."
+(
+    # 延迟（如果是 0 就直接跳过）
+    if [ "$SLEEP_SEC" -gt 0 ] 2>/dev/null; then
+        sleep "$SLEEP_SEC"
+    fi
+
+    /sbin/ifup "$WAN_IF" 2>/dev/null
+    sleep 1
+    /sbin/ifup "$WAN6_IF" 2>/dev/null
+
+    rm -f "$STATE_FILE"
+) &
+
+exit 0
