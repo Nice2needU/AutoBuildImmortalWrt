@@ -73,19 +73,23 @@ fi
 # 若构建openclash 则添加内核
 if echo "$PACKAGES" | grep -q "luci-app-openclash"; then
     echo "✅ 已选择 luci-app-openclash，添加 openclash core"
-    mkdir -p files/etc/openclash/core
+    mkdir -p /home/build/immortalwrt/files/etc/openclash/core
     # Download clash_meta
     META_URL="https://raw.githubusercontent.com/vernesong/OpenClash/core/master/meta/clash-linux-amd64-v1.tar.gz"
-    wget -qO- $META_URL | tar xOvz > files/etc/openclash/core/clash_meta
-    chmod +x files/etc/openclash/core/clash_meta
+    wget -qO- $META_URL | tar xOvz > /home/build/immortalwrt/files/etc/openclash/core/clash_meta
+    chmod +x /home/build/immortalwrt/files/etc/openclash/core/clash_meta
     # Download GeoIP and GeoSite
-    wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat -O files/etc/openclash/GeoIP.dat
-    wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat -O files/etc/openclash/GeoSite.dat
+    wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat -O /home/build/immortalwrt/files/etc/openclash/GeoIP.dat
+    wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat -O /home/build/immortalwrt/files/etc/openclash/GeoSite.dat
     # Download latest openclash Client
     URL=$(curl -s https://api.github.com/repos/vernesong/OpenClash/releases/latest \
       | grep "browser_download_url.*apk" \
       | head -n1 \
       | cut -d '"' -f 4)
+    if [ -z "$URL" ]; then
+        echo "❌ 获取 OpenClash 下载地址失败（可能是 GitHub API 限流）"
+        exit 1
+    fi
     echo "OpenClash latest apk: $URL"
     wget "$URL" -P /home/build/immortalwrt/packages/
 else
@@ -94,14 +98,23 @@ fi
 
 if echo "$PACKAGES" | grep -q "luci-app-ssr-plus"; then
     echo "✅ 已选择 luci-app-ssr-plus，添加 mihomo core"
-    mkdir -p files/usr/bin
+    mkdir -p /home/build/immortalwrt/files/usr/bin
     # Download mihomo
-    MIHOMO_URL="https://github.com/MetaCubeX/mihomo/releases/download/v1.19.24/mihomo-linux-amd64-compatible-v1.19.24.gz"
-    mkdir -p files/usr/bin
-    wget -qO- "$MIHOMO_URL" | gzip -dc > files/usr/bin/mihomo
-    chmod +x files/usr/bin/mihomo
+   MIHOMO_URL=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/latest \
+      | grep -o '"browser_download_url": *"[^"]*"' \
+      | cut -d'"' -f4 \
+      | grep 'linux-amd64-.*\.gz$' \
+      | grep -v 'compatible' \
+      | head -n1)
+    if [ -z "$MIHOMO_URL" ]; then
+        echo "❌ 获取 mihomo 下载地址失败（可能是 GitHub API 限流）"
+        exit 1
+    fi
+    echo "mihomo latest: $MIHOMO_URL"
+    wget -qO- "$MIHOMO_URL" | gzip -dc > /home/build/immortalwrt/files/usr/bin/mihomo
+    chmod +x /home/build/immortalwrt/files/usr/bin/mihomo
     echo "✅ 已下载 mihomo core"
-    ls -lah files/usr/bin
+    ls -lah /home/build/immortalwrt/files/usr/bin
 else
     echo "⚪️ 未选择 luci-app-ssr-plus"
 fi
