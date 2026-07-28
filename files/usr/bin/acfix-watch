@@ -1,0 +1,79 @@
+#!/bin/sh
+# 智能版 AC 监控：考虑链路状态 + 连续失败 + 冷却时间 + 单实例锁
+LOGTAG="acfix-watch"
+AC_IP="192.168.20.2"
+DEV="eth1.20"
+
+SLEEP_SEC=10         # 检测间隔（秒）
+FAIL_THRESHOLD=3     # 连续多少次 ping 失败才认定为 unreachable
+COOLDOWN_SEC=60      # 两次修复之间的最小间隔（秒）
+
+# 简单单实例锁，防止误多开
+LOCK_DIR="/var/run/acfix-watch.lock"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    logger -t "$LOGTAG" "another instance already running, exiting."
+    exit 0
+fi
+
+cleanup() {
+    rmdir "$LOCK_DIR" 2>/dev/null
+}
+trap cleanup EXIT INT TERM
+
+logger -t "$LOGTAG" "started (interval=${SLEEP_SEC}s, target=$AC_IP, dev=$DEV)"
+
+fail_count=0
+last_fix_ts=0
+last_state="unknown"    # ok / bad / link-down / unknown
+
+while true; do
+    # 1. 先看接口状态，如果 eth1.20 本身就没 up，说明 AC 在重启或没插好线
+    if [ -d "/sys/class/net/$DEV" ]; then
+        operstate="$(cat /sys/class/net/$DEV/operstate 2>/dev/null)"
+    else
+        operstate="unknown"
+    fi
+
+    if [ "$operstate" != "up" ]; then
+        # 接口没起来，没必要刷 acfix-fix，等下一轮
+        if [ "$last_state" != "link-down" ]; then
+            logger -t "$LOGTAG" "dev $DEV operstate=$operstate, link not up — skip check."
+            last_state="link-down"
+        fi
+        fail_count=0
+        sleep "$SLEEP_SEC"
+        continue
+    fi
+
+    # 2. 接口是 up，再尝试 ping AC
+    if ping -c 1 -W 1 "$AC_IP" >/dev/null 2>&1; then
+        # 如果之前是 bad，现在恢复了，打一条恢复日志
+        if [ "$last_state" = "bad" ]; then
+            logger -t "$LOGTAG" "AC $AC_IP reachable again, fail_count reset."
+        fi
+        last_state="ok"
+        fail_count=0
+    else
+        fail_count=$((fail_count + 1))
+        if [ "$fail_count" -ge "$FAIL_THRESHOLD" ]; then
+            now_ts="$(date +%s 2>/dev/null)"
+            can_fix=1
+
+            if [ -n "$now_ts" ] && [ "$last_fix_ts" -gt 0 ]; then
+                diff=$((now_ts - last_fix_ts))
+                if [ "$diff" -lt "$COOLDOWN_SEC" ]; then
+                    can_fix=0
+                fi
+            fi
+
+            if [ "$can_fix" -eq 1 ]; then
+                logger -t "$LOGTAG" "AC $AC_IP unreachable (fail_count=$fail_count, dev=$DEV) — running acfix-fix"
+                /usr/bin/acfix-fix
+                last_fix_ts="$now_ts"
+                last_state="bad"
+            fi
+        fi
+    fi
+
+    sleep "$SLEEP_SEC"
+done
