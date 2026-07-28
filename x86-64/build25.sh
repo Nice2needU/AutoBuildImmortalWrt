@@ -138,8 +138,15 @@ fetch_apk() {
   curl -sL -o "$workdir/pkg.bin" "$url"
   case "$url" in
     *.zip) (cd "$workdir" && unzip -oq pkg.bin) ;;
+    *.apk) cp "$workdir/pkg.bin" "$PKGDIR/$(basename "$url")"; rm -rf "$workdir"; return 0 ;;
     *)     tar -xzf "$workdir/pkg.bin" -C "$workdir" ;;
   esac
+  local count
+  count=$(find "$workdir" -name '*.apk' | wc -l)
+  if [ "$count" -eq 0 ]; then
+    echo "!! ${repo} 解压后未找到任何 apk 文件"; rm -rf "$workdir"; return 1
+  fi
+  echo "✅ ${repo}: 找到 ${count} 个 apk"
   find "$workdir" -name '*.apk' -exec cp {} "$PKGDIR/" \;
   rm -rf "$workdir"
 }
@@ -147,7 +154,18 @@ FAILED=0
 fetch_apk "sirpdboy/netspeedtest"      'SNAPSHOT-x86_64\.tar\.gz$' || FAILED=1
 fetch_apk "sbwml/luci-app-mosdns"      'x86_64.*(openwrt-25\.12|SNAPSHOT)\.tar\.gz$' || FAILED=1
 fetch_apk "nikkinikki-org/OpenWrt-momo" 'momo_x86_64-openwrt-25\.12\.tar\.gz$' || FAILED=1
-fetch_apk "sirpdboy/luci-app-advancedplus" '\.apk' || FAILED=1
+# advancedplus 直接下载 apk 文件（非压缩包）
+ADV_URLS=$(curl -s https://api.github.com/repos/sirpdboy/luci-app-advancedplus/releases/latest \
+  | grep -o '"browser_download_url": *"[^"]*\.apk"' \
+  | cut -d'"' -f4)
+if [ -z "$ADV_URLS" ]; then
+  echo "❌ 未找到 advancedplus 的 apk 资产"
+  exit 1
+fi
+for u in $ADV_URLS; do
+  echo "下载: $u"
+  curl -sL -o "$PKGDIR/$(basename "$u")" "$u"
+done
 
 if [ "$FAILED" = "1" ]; then
   echo "❌ 有第三方 apk 下载失败，请检查上方日志中的资产名是否匹配"
@@ -164,6 +182,7 @@ fi
     fi
   done
 )
+
 echo "=== packages 目录最终内容 ==="
 ls -lah "$PKGDIR"
 
