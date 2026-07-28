@@ -1,0 +1,24 @@
+#!/bin/sh
+# 统一 AC 修复逻辑：静态 ARP + GARP
+
+LOGTAG="acfix-fix"
+AC_IP="192.168.20.2"
+AC_GW="192.168.20.1"
+AC_MAC="9C:47:82:43:04:AC"
+DEV="eth1.20"
+
+# 写静态 ARP（上游看到 AC）
+ip neigh replace "$AC_IP" dev "$DEV" lladdr "$AC_MAC" nud permanent 2>/dev/null
+
+# 刷新 ImmortalWrt -> AC 的 ARP
+arping -U -c 2 -I "$DEV" "$AC_IP" >/dev/null 2>&1
+
+# 刷新 AC -> 192.168.20.1 的 ARP
+arping -A -c 1 -I "$DEV" "$AC_GW" >/dev/null 2>&1
+
+# 简单联通性测试（给 logread 看）
+if ping -c 1 -W 1 "$AC_IP" >/dev/null 2>&1; then
+    logger -t "$LOGTAG" "AC $AC_IP reachable after fix"
+else
+    logger -t "$LOGTAG" "WARNING: AC $AC_IP still unreachable after fix"
+fi
