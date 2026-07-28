@@ -133,6 +133,17 @@ fetch_apk "sbwml/luci-app-mosdns"      'x86_64.*(openwrt-25\.12|SNAPSHOT)\.tar\.
 fetch_apk "nikkinikki-org/OpenWrt-momo" 'momo_x86_64-openwrt-25\.12\.tar\.gz$'
 fetch_apk "sirpdboy/luci-app-advancedplus" '\.apk'
 
+cd "$PKGDIR" || exit 1
+for f in *.apk; do
+  [ -e "$f" ] || continue
+  # 从第一个 "-数字" 处截断，保留包名部分
+  newname=$(echo "$f" | sed -E 's/-[0-9][^-]*\.apk$/.apk/')
+  if [ "$f" != "$newname" ]; then
+    echo "重命名: $f -> $newname"
+    mv -f "$f" "$newname"
+  fi
+done
+
 # 构建镜像
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Building image with the following packages:"
 echo "$PACKAGES"
