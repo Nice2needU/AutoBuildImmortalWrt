@@ -1,0 +1,30 @@
+#!/bin/sh
+LOGTAG="acfix-pro"
+AC_IP="192.168.20.2"
+
+# DEVICE / DEVICENAME 有一个等于 eth1.20 即可
+if [ "$DEVICE" != "eth1.20" ] && [ "$DEVICENAME" != "eth1.20" ]; then
+    exit 0
+fi
+
+STATE_FILE="/tmp/acfix.last_run"
+now_ts="$(date +%s 2>/dev/null)"
+
+# 防抖：10 秒内只跑一次
+if [ -n "$now_ts" ]; then
+    if [ -f "$STATE_FILE" ]; then
+        last_ts="$(cat "$STATE_FILE" 2>/dev/null)"
+        if [ -n "$last_ts" ]; then
+            diff=$((now_ts - last_ts))
+            if [ "$diff" -lt 10 ]; then
+                logger -t "$LOGTAG" "skip: too frequent (ACTION=$ACTION DEVICE=$DEVICE DEVICENAME=$DEVICENAME)"
+                exit 0
+            fi
+        fi
+    fi
+    echo "$now_ts" > "$STATE_FILE"
+fi
+
+NAME="${DEVICE:-$DEVICENAME}"
+logger -t "$LOGTAG" "hotplug on $NAME (ACTION=$ACTION) — calling acfix-fix"
+/usr/bin/acfix-fix
