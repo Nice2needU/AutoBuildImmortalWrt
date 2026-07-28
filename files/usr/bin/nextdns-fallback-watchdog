@@ -1,0 +1,82 @@
+#!/bin/sh
+
+PORT="5555"
+
+# Check once every 5 minutes
+CHECK_INTERVAL="300"
+
+# Require 2 consecutive failed checks before fallback.
+# With 300s interval, this means NextDNS has been bad for about 5+ minutes.
+FAIL_LIMIT="2"
+
+CONF="/etc/dnsmasq.d/99-nextdns-fallback.conf"
+RESOLV="/tmp/resolv.conf.d/resolv.conf.auto"
+
+nextdns_ok() {
+q="probe-$(date +%s)-$$.example.com"
+
+dig @127.0.0.1 -p "$PORT" "$q" A +time=3 +tries=1 2>/dev/null \
+| grep -Eq 'status: (NOERROR|NXDOMAIN)'
+}
+
+apply_conf() {
+mode="$1"
+tmp="$2"
+
+if ! cmp -s "$tmp" "$CONF" 2>/dev/null; then
+mv "$tmp" "$CONF"
+/etc/init.d/dnsmasq restart >/dev/null 2>&1
+logger -t nextdns-fallback "dnsmasq upstream switched to $mode"
+else
+rm -f "$tmp"
+fi
+}
+
+switch_to_nextdns() {
+tmp="/tmp/nextdns-fallback.$$"
+
+{
+echo "# managed by nextdns fallback watchdog"
+echo "server=127.0.0.1#$PORT"
+} > "$tmp"
+
+apply_conf "NextDNS" "$tmp"
+}
+
+switch_to_isp() {
+tmp="/tmp/nextdns-fallback.$$"
+
+{
+echo "# managed by nextdns fallback watchdog"
+awk '
+$1 == "nameserver" && $2 !~ /^127\./ && $2 != "::1" {
+print "server=" $2
+}
+' "$RESOLV"
+} > "$tmp"
+
+if grep -q '^server=' "$tmp"; then
+apply_conf "ISP DNS" "$tmp"
+else
+rm -f "$tmp"
+logger -t nextdns-fallback "No ISP DNS found in $RESOLV"
+fi
+}
+
+fail_count=0
+
+while true; do
+if nextdns_ok; then
+fail_count=0
+switch_to_nextdns
+else
+fail_count=$((fail_count + 1))
+logger -t nextdns-fallback "NextDNS check failed: $fail_count/$FAIL_LIMIT"
+
+if [ "$fail_count" -ge "$FAIL_LIMIT" ]; then
+switch_to_isp
+fi
+fi
+
+sleep "$CHECK_INTERVAL"
+done
