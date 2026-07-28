@@ -112,42 +112,53 @@ mkdir -p "$PKGDIR"
 # 通用函数：从 GitHub 最新 Release 下载匹配资产并解出 apk
 fetch_apk() {
   local repo="$1" pattern="$2"
+  local workdir
+  workdir=$(mktemp -d)
   local url
   url=$(curl -s "https://api.github.com/repos/${repo}/releases/latest" \
     | grep -o '"browser_download_url": *"[^"]*"' \
     | cut -d'"' -f4 | grep -E "$pattern" | head -n1)
   if [ -z "$url" ]; then
-    echo "!! 未找到资产: ${repo} ${pattern}"; return 1
+    echo "!! 未找到资产: ${repo} ${pattern}"; rm -rf "$workdir"; return 1
   fi
   echo "下载: $url"
-  curl -sL -o /tmp/pkg.bin "$url"
+  curl -sL -o "$workdir/pkg.bin" "$url"
   case "$url" in
-    *.zip) (cd /tmp && unzip -o pkg.bin) ;;
-    *)     tar -xzf /tmp/pkg.bin -C /tmp ;;
+    *.zip) (cd "$workdir" && unzip -oq pkg.bin) ;;
+    *)     tar -xzf "$workdir/pkg.bin" -C "$workdir" ;;
   esac
-  find /tmp -maxdepth 3 -name '*.apk' -exec cp {} "$PKGDIR/" \;
+  find "$workdir" -name '*.apk' -exec cp {} "$PKGDIR/" \;
+  rm -rf "$workdir"
 }
+FAILED=0
+fetch_apk "sirpdboy/netspeedtest"      'SNAPSHOT-x86_64\.tar\.gz$' || FAILED=1
+fetch_apk "sbwml/luci-app-mosdns"      'x86_64.*(openwrt-25\.12|SNAPSHOT)\.tar\.gz$' || FAILED=1
+fetch_apk "nikkinikki-org/OpenWrt-momo" 'momo_x86_64-openwrt-25\.12\.tar\.gz$' || FAILED=1
+fetch_apk "sirpdboy/luci-app-advancedplus" '\.apk' || FAILED=1
 
-fetch_apk "sirpdboy/netspeedtest"      'SNAPSHOT-x86_64\.tar\.gz$'
-fetch_apk "sbwml/luci-app-mosdns"      'x86_64.*(openwrt-25\.12|SNAPSHOT)\.tar\.gz$'
-fetch_apk "nikkinikki-org/OpenWrt-momo" 'momo_x86_64-openwrt-25\.12\.tar\.gz$'
-fetch_apk "sirpdboy/luci-app-advancedplus" '\.apk'
-
-cd "$PKGDIR" || exit 1
-for f in *.apk; do
-  [ -e "$f" ] || continue
-  # 从第一个 "-数字" 处截断，保留包名部分
-  newname=$(echo "$f" | sed -E 's/-[0-9][^-]*\.apk$/.apk/')
-  if [ "$f" != "$newname" ]; then
-    echo "重命名: $f -> $newname"
-    mv -f "$f" "$newname"
-  fi
-done
+if [ "$FAILED" = "1" ]; then
+  echo "❌ 有第三方 apk 下载失败，请检查上方日志中的资产名是否匹配"
+  exit 1
+fi
+(
+  cd "$PKGDIR" || exit 1
+  for f in *.apk; do
+    [ -e "$f" ] || continue
+    newname=$(echo "$f" | sed -E 's/-[0-9][^-]*\.apk$/.apk/')
+    if [ "$f" != "$newname" ]; then
+      echo "重命名: $f -> $newname"
+      mv -f "$f" "$newname"
+    fi
+  done
+)
+echo "=== packages 目录最终内容 ==="
+ls -lah "$PKGDIR"
 
 # 构建镜像
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Building image with the following packages:"
 echo "$PACKAGES"
 
+cd /home/build/immortalwrt
 make image PROFILE="generic" PACKAGES="$PACKAGES" FILES="/home/build/immortalwrt/files" ROOTFS_PARTSIZE=$PROFILE
 
 if [ $? -ne 0 ]; then
