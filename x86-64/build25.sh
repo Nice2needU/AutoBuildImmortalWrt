@@ -167,7 +167,7 @@ for u in $ADV_URLS; do
   curl -sL -o "$PKGDIR/$(basename "$u")" "$u"
 done
 
-# AdGuardHome：直接下载最新 Release 中的两个 apk 文件
+# Steven 的 AdGuardHome LuCI 插件：直接下载 Release 中的两个 APK
 ADG_URLS=$(
   curl -fsSL \
     https://api.github.com/repos/stevenjoezhang/luci-app-adguardhome/releases/latest \
@@ -182,12 +182,12 @@ ADG_APP_FOUND=0
 ADG_I18N_FOUND=0
 
 if [ -z "$ADG_URLS" ]; then
-  echo "❌ 未找到 AdGuardHome 的 apk 资产"
+  echo "❌ 未找到 Steven AdGuardHome 的 APK 资产"
   FAILED=1
 else
   for u in $ADG_URLS; do
     pkg_name=$(basename "$u")
-    echo "下载 AdGuardHome: $u"
+    echo "下载 AdGuardHome APK: $pkg_name"
 
     if ! curl -fsSL -o "$PKGDIR/$pkg_name" "$u"; then
       echo "❌ 下载失败: $pkg_name"
@@ -207,7 +207,7 @@ else
 fi
 
 if [ "$ADG_APP_FOUND" != "1" ] || [ "$ADG_I18N_FOUND" != "1" ]; then
-  echo "❌ AdGuardHome 主程序或中文语言包未完整下载"
+  echo "❌ AdGuardHome 主插件或中文包未完整下载"
   FAILED=1
 fi
 
