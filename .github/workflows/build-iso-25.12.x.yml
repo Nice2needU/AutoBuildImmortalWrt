@@ -63,6 +63,14 @@ jobs:
 
       - name: Set executable permissions
         run: chmod +x ${{ github.workspace }}/x86-64/build25.sh
+
+      - name: Set custom script permissions
+        run: |
+          for d in files/etc/init.d files/etc/hotplug.d files/root files/usr/bin files/etc/uci-defaults; do
+            if [ -d "$d" ]; then
+              find "$d" -type f -exec chmod 755 {} +
+            fi
+          done
       
       - name: Validate PPPoE Inputs
         run: |
