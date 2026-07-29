@@ -75,6 +75,7 @@ CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-i18n-openlist-zh-cn"
 CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-i18n-commands-zh-cn"
 
 #===========================以下imm仓库内的软件==============================↓
+CUSTOM_PACKAGES="$CUSTOM_PACKAGES avahi-utils acme-acmesh-dnsapi luci-ssl-openssl tcpdump bind-dig ss mtr-json hping3 arp-scan nmap-full bind-nslookup bind-host tc-full iftop vnstat2 luci-app-vnstat2 luci-i18n-vnstat2-zh-cn bmon ip-bridge iputils-arping htop procps-ng lsof strace pciutils usbutils"
 #CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-i18n-3cat-zh-cn"
 #CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-i18n-3ginfo-lite-zh-cn"
 #CUSTOM_PACKAGES="$CUSTOM_PACKAGES luci-i18n-acl-zh-cn"
