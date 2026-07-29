@@ -65,7 +65,7 @@ jobs:
         
       - name: Set custom script permissions
         run: |
-          for d in files/etc/init.d files/etc/hotplug.d files/root files/usr/bin files/etc/uci-defaults; do
+          for d in files/etc/init.d files/etc/hotplug.d files/etc/sysctl.d files/root files/usr/bin files/etc/uci-defaults; do
             if [ -d "$d" ]; then
               find "$d" -type f -exec chmod 755 {} +
             fi
