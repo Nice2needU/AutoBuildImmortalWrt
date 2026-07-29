@@ -167,6 +167,50 @@ for u in $ADV_URLS; do
   curl -sL -o "$PKGDIR/$(basename "$u")" "$u"
 done
 
+# AdGuardHome：直接下载最新 Release 中的两个 apk 文件
+ADG_URLS=$(
+  curl -fsSL \
+    https://api.github.com/repos/stevenjoezhang/luci-app-adguardhome/releases/latest \
+    | grep -o '"browser_download_url": *"[^"]*\.apk"' \
+    | cut -d'"' -f4 \
+    | grep -E \
+      '/(luci-app-adguardhome-[^/]+|luci-i18n-adguardhome-zh-cn-[^/]+)\.apk$' \
+    || true
+)
+
+ADG_APP_FOUND=0
+ADG_I18N_FOUND=0
+
+if [ -z "$ADG_URLS" ]; then
+  echo "❌ 未找到 AdGuardHome 的 apk 资产"
+  FAILED=1
+else
+  for u in $ADG_URLS; do
+    pkg_name=$(basename "$u")
+    echo "下载 AdGuardHome: $u"
+
+    if ! curl -fsSL -o "$PKGDIR/$pkg_name" "$u"; then
+      echo "❌ 下载失败: $pkg_name"
+      FAILED=1
+      continue
+    fi
+
+    case "$pkg_name" in
+      luci-app-adguardhome-*.apk)
+        ADG_APP_FOUND=1
+        ;;
+      luci-i18n-adguardhome-zh-cn-*.apk)
+        ADG_I18N_FOUND=1
+        ;;
+    esac
+  done
+fi
+
+if [ "$ADG_APP_FOUND" != "1" ] || [ "$ADG_I18N_FOUND" != "1" ]; then
+  echo "❌ AdGuardHome 主程序或中文语言包未完整下载"
+  FAILED=1
+fi
+
 if [ "$FAILED" = "1" ]; then
   echo "❌ 有第三方 apk 下载失败，请检查上方日志中的资产名是否匹配"
   exit 1
