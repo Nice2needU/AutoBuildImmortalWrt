@@ -34,9 +34,7 @@ else
   cp -r /tmp/store-apk-repo/run/x86/* /home/build/immortalwrt/extra-packages/
 
   echo "✅ Run files copied to extra-packages:"
-  # 解压并拷贝apk到packages目录
-  sh shell/apk-prepare-packages.sh
-  ls -lah /home/build/immortalwrt/packages/
+  # 稍后会在所有自定义 APK 下载完成后统一处理并建立索引
 fi
 
 
@@ -63,6 +61,27 @@ PACKAGES="$PACKAGES openssh-sftp-server"
 # 合并imm仓库以外的第三方插件 暂时注释
 PACKAGES="$PACKAGES $CUSTOM_PACKAGES"
 
+# ======== 本脚本下载到 packages/ 的第三方 APK ========
+
+# 高级设置
+PACKAGES="$PACKAGES luci-app-advancedplus"
+PACKAGES="$PACKAGES luci-i18n-advancedplus-zh-cn"
+
+# 网络测速
+PACKAGES="$PACKAGES luci-app-netspeedtest"
+PACKAGES="$PACKAGES luci-i18n-netspeedtest-zh-cn"
+
+# MosDNS
+PACKAGES="$PACKAGES luci-app-mosdns"
+PACKAGES="$PACKAGES luci-i18n-mosdns-zh-cn"
+
+# momo
+PACKAGES="$PACKAGES momo"
+PACKAGES="$PACKAGES luci-app-momo"
+PACKAGES="$PACKAGES luci-i18n-momo-zh-cn"
+
+# AdGuardHome 核心使用 ImmortalWrt 官方包
+PACKAGES="$PACKAGES adguardhome"
 
 # 判断是否需要编译 Docker 插件
 if [ "$INCLUDE_DOCKER" = "yes" ]; then
@@ -167,7 +186,7 @@ for u in $ADV_URLS; do
   curl -sL -o "$PKGDIR/$(basename "$u")" "$u"
 done
 
-# Steven 的 AdGuardHome LuCI 插件：直接下载 Release 中的两个 APK
+# Steven 的 AdGuardHome LuCI 插件：下载最新 Release 的主插件及中文包
 ADG_URLS=$(
   curl -fsSL \
     https://api.github.com/repos/stevenjoezhang/luci-app-adguardhome/releases/latest \
@@ -180,6 +199,8 @@ ADG_URLS=$(
 
 ADG_APP_FOUND=0
 ADG_I18N_FOUND=0
+ADG_APP_VERSION=""
+ADG_I18N_VERSION=""
 
 if [ -z "$ADG_URLS" ]; then
   echo "❌ 未找到 Steven AdGuardHome 的 APK 资产"
@@ -198,9 +219,18 @@ else
     case "$pkg_name" in
       luci-app-adguardhome-*.apk)
         ADG_APP_FOUND=1
+        ADG_APP_VERSION=$(
+          echo "$pkg_name" \
+            | sed -E 's/^luci-app-adguardhome-(.+)\.apk$/\1/'
+        )
         ;;
       luci-i18n-adguardhome-zh-cn-*.apk)
         ADG_I18N_FOUND=1
+        ADG_I18N_VERSION=$(
+          echo "$pkg_name" \
+            | sed -E \
+              's/^luci-i18n-adguardhome-zh-cn-(.+)\.apk$/\1/'
+        )
         ;;
     esac
   done
@@ -209,12 +239,21 @@ fi
 if [ "$ADG_APP_FOUND" != "1" ] || [ "$ADG_I18N_FOUND" != "1" ]; then
   echo "❌ AdGuardHome 主插件或中文包未完整下载"
   FAILED=1
+else
+  echo "✅ Steven AdGuardHome 主插件版本: $ADG_APP_VERSION"
+  echo "✅ Steven AdGuardHome 中文包版本: $ADG_I18N_VERSION"
+
+  PACKAGES="$PACKAGES luci-app-adguardhome=$ADG_APP_VERSION"
+  PACKAGES="$PACKAGES luci-i18n-adguardhome-zh-cn=$ADG_I18N_VERSION"
 fi
 
 if [ "$FAILED" = "1" ]; then
   echo "❌ 有第三方 apk 下载失败，请检查上方日志中的资产名是否匹配"
   exit 1
 fi
+
+echo "=== 处理 extra-packages 并准备本地第三方 APK ==="
+sh shell/apk-prepare-packages.sh
 
 echo "=== packages 目录最终内容 ==="
 ls -lah "$PKGDIR"
